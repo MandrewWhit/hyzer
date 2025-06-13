@@ -6,6 +6,7 @@ import 'previous_scorecards_screen.dart';
 import 'course_photo_upload_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'scorecard_detail_screen.dart';
 
 class CurrentHoleScreen extends StatefulWidget {
   final Scorecard scorecard;
@@ -216,6 +217,73 @@ class _CurrentHoleScreenState extends State<CurrentHoleScreen> {
     }
   }
 
+  Future<void> _saveAndReturnHome() async {
+    if (_isSaving) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final scorecardRef = FirebaseFirestore.instance
+          .collection('scorecards')
+          .doc(widget.scorecard.id);
+
+      // Create a new scorecard with updated scores
+      final updatedScores =
+          Map<String, List<int>>.from(widget.scorecard.scores);
+      _currentScores.forEach((player, score) {
+        updatedScores[player]![widget.currentHole - 1] = score[0];
+      });
+
+      final updatedScorecard = widget.scorecard.copyWith(
+        scores: updatedScores,
+        lastUpdated: DateTime.now(),
+      );
+
+      // Save to Firestore
+      await scorecardRef.set({
+        'scores': updatedScores,
+        'lastUpdated': Timestamp.fromDate(updatedScorecard.lastUpdated!),
+      }, SetOptions(merge: true));
+
+      if (mounted) {
+        Navigator.pop(context);
+        // Pop back to the scorecard detail screen and force a reload
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                ScorecardDetailScreen(
+              scorecard: updatedScorecard,
+            ),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              const begin = Offset(1.0, 0.0);
+              const end = Offset.zero;
+              const curve = Curves.easeInOut;
+              var tween =
+                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+              var offsetAnimation = animation.drive(tween);
+              return SlideTransition(position: offsetAnimation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 300),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving scorecard: $e')),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -239,7 +307,7 @@ class _CurrentHoleScreenState extends State<CurrentHoleScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.save, color: Colors.white),
-                    onPressed: _isSaving ? null : _saveAndContinue,
+                    onPressed: _isSaving ? null : _saveAndReturnHome,
                   ),
                 ],
               ),
