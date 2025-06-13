@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Scorecard {
   final String id;
+  final String courseId;
   final String courseName;
   final List<String> players;
   final int numberOfHoles;
@@ -9,9 +10,11 @@ class Scorecard {
   final DateTime createdAt;
   final DateTime? lastUpdated;
   final String userId;
+  final int currentHole;
 
   Scorecard({
     required this.id,
+    required this.courseId,
     required this.courseName,
     required this.players,
     required this.numberOfHoles,
@@ -19,10 +22,12 @@ class Scorecard {
     required this.createdAt,
     this.lastUpdated,
     required this.userId,
+    this.currentHole = 1,
   });
 
   Map<String, dynamic> toMap() {
     return {
+      'courseId': courseId,
       'courseName': courseName,
       'players': players,
       'numberOfHoles': numberOfHoles,
@@ -31,12 +36,14 @@ class Scorecard {
       'lastUpdated':
           lastUpdated != null ? Timestamp.fromDate(lastUpdated!) : null,
       'userId': userId,
+      'currentHole': currentHole,
     };
   }
 
   factory Scorecard.fromMap(String id, Map<String, dynamic> map) {
     return Scorecard(
       id: id,
+      courseId: map['courseId'] as String,
       courseName: map['courseName'] as String,
       players: List<String>.from(map['players'] as List),
       numberOfHoles: map['numberOfHoles'] as int,
@@ -50,6 +57,7 @@ class Scorecard {
           ? (map['lastUpdated'] as Timestamp).toDate()
           : null,
       userId: map['userId'] as String,
+      currentHole: map['currentHole'] as int? ?? 1,
     );
   }
 
@@ -59,9 +67,11 @@ class Scorecard {
     int? numberOfHoles,
     Map<String, List<int>>? scores,
     DateTime? lastUpdated,
+    int? currentHole,
   }) {
     return Scorecard(
       id: id,
+      courseId: courseId,
       courseName: courseName ?? this.courseName,
       players: players ?? this.players,
       numberOfHoles: numberOfHoles ?? this.numberOfHoles,
@@ -69,6 +79,7 @@ class Scorecard {
       createdAt: createdAt,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       userId: userId,
+      currentHole: currentHole ?? this.currentHole,
     );
   }
 }

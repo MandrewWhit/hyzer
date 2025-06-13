@@ -144,6 +144,7 @@ class _ScorecardDetailScreenState extends State<ScorecardDetailScreen> {
                       builder: (context) => CurrentHoleScreen(
                         scorecard: widget.scorecard,
                         currentHole: 1,
+                        isNewCourse: false,
                       ),
                     ),
                   );

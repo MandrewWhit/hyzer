@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
-import '../scorecard/new_scorecard_screen.dart';
+import '../course/course_selection_screen.dart';
 import '../scorecard/previous_scorecards_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -39,7 +39,7 @@ class HomeScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const NewScorecardScreen(),
+                      builder: (context) => const CourseSelectionScreen(),
                     ),
                   );
                 },

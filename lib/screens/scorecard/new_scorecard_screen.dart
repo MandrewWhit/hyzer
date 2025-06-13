@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../services/auth_service.dart';
+import '../../services/course_service.dart';
+import '../../models/course.dart';
 import '../../models/scorecard.dart';
 import 'current_hole_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class NewScorecardScreen extends StatefulWidget {
-  const NewScorecardScreen({super.key});
+  final Course? selectedCourse;
+  final bool isCreatingCourse;
+
+  const NewScorecardScreen({
+    super.key,
+    this.selectedCourse,
+    this.isCreatingCourse = false,
+  });
 
   @override
   State<NewScorecardScreen> createState() => _NewScorecardScreenState();
@@ -14,18 +24,36 @@ class NewScorecardScreen extends StatefulWidget {
 
 class _NewScorecardScreenState extends State<NewScorecardScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _courseNameController = TextEditingController();
   final _playerController = TextEditingController();
   final List<String> _players = [];
   int _numberOfHoles = 18;
   final Color mintColor = const Color(0xFF7BD6B6);
   final Color primaryColor = const Color(0xFF40454B);
+  final _courseService = CourseService();
+  final _authService = AuthService();
+
+  bool _isLoading = true;
+  Position? _userLocation;
 
   @override
-  void dispose() {
-    _courseNameController.dispose();
-    _playerController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _getUserLocation();
+  }
+
+  Future<void> _getUserLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _userLocation = position;
+      });
+    } catch (e) {
+      print('Error getting location: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _addPlayer() {
@@ -45,11 +73,12 @@ class _NewScorecardScreenState extends State<NewScorecardScreen> {
 
   Future<void> _createScorecard() async {
     if (_formKey.currentState!.validate() && _players.isNotEmpty) {
-      final userId =
-          Provider.of<AuthService>(context, listen: false).currentUser!.uid;
+      final userId = _authService.currentUser!.uid;
       final scorecard = Scorecard(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        courseName: _courseNameController.text,
+        courseId: widget.selectedCourse?.id ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
+        courseName: widget.selectedCourse?.name ?? 'New Course',
         players: _players,
         numberOfHoles: _numberOfHoles,
         scores: Map.fromIterables(
@@ -57,6 +86,7 @@ class _NewScorecardScreenState extends State<NewScorecardScreen> {
           List.generate(_players.length, (_) => List.filled(_numberOfHoles, 0)),
         ),
         createdAt: DateTime.now(),
+        lastUpdated: DateTime.now(),
         userId: userId,
       );
 
@@ -74,6 +104,7 @@ class _NewScorecardScreenState extends State<NewScorecardScreen> {
               builder: (context) => CurrentHoleScreen(
                 scorecard: scorecard,
                 currentHole: 1,
+                isNewCourse: widget.isCreatingCourse,
               ),
             ),
           );
@@ -104,75 +135,29 @@ class _NewScorecardScreenState extends State<NewScorecardScreen> {
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
                     onPressed: () => Navigator.pop(context),
                   ),
+                  const SizedBox(width: 8),
+                  Text(
+                    widget.selectedCourse?.name ?? 'New Course',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _courseNameController,
-                style: TextStyle(color: mintColor),
-                decoration: InputDecoration(
-                  labelText: 'Course Name',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: mintColor),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: mintColor),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: mintColor),
-                  ),
-                  fillColor: primaryColor,
-                  filled: true,
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a course name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                value: _numberOfHoles,
-                style: TextStyle(color: mintColor),
-                dropdownColor: primaryColor,
-                decoration: InputDecoration(
-                  labelText: 'Number of Holes',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: mintColor),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: mintColor),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: mintColor),
-                  ),
-                  fillColor: primaryColor,
-                  filled: true,
-                ),
-                items: [9, 18, 27, 36].map((holes) {
-                  return DropdownMenuItem(
-                    value: holes,
-                    child: Text('$holes holes'),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _numberOfHoles = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
+              const SizedBox(height: 32),
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
                       controller: _playerController,
-                      style: TextStyle(color: mintColor),
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        labelText: 'Player Name',
+                        labelText: 'Add Player',
                         labelStyle: const TextStyle(color: Colors.white70),
                         border: OutlineInputBorder(
                           borderSide: BorderSide(color: mintColor),
@@ -185,57 +170,55 @@ class _NewScorecardScreenState extends State<NewScorecardScreen> {
                         ),
                         fillColor: primaryColor,
                         filled: true,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.add, color: Colors.white),
+                          onPressed: _addPlayer,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _addPlayer,
-                    icon: const Icon(Icons.add, color: Colors.white),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (_players.isNotEmpty) ...[
-                const Text(
-                  'Players:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...List.generate(_players.length, (index) {
-                  return ListTile(
-                    title: Text(
-                      _players[index],
-                      style: const TextStyle(color: Colors.white),
+                    const SizedBox(height: 16),
+                    if (_players.isNotEmpty) ...[
+                      const Text(
+                        'Players:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...List.generate(_players.length, (index) {
+                        return ListTile(
+                          title: Text(
+                            _players[index],
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.remove_circle_outline,
+                                color: Colors.white),
+                            onPressed: () => _removePlayer(index),
+                          ),
+                        );
+                      }),
+                    ],
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _players.isNotEmpty ? _createScorecard : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: mintColor, width: 2),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          _isLoading ? 'Loading...' : 'Start Scorecard',
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                      ),
                     ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.remove_circle_outline,
-                          color: Colors.white),
-                      onPressed: () => _removePlayer(index),
-                    ),
-                  );
-                }),
-              ],
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _createScorecard,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  side: BorderSide(color: mintColor, width: 2),
+                  ],
                 ),
-                child: const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    'Start Scorecard',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
